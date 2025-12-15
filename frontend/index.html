@@ -635,6 +635,14 @@
                             导入配置
                         </button>
                     </div>
+
+                    <!-- MCP 服务器管理 -->
+                    <div class="mt-4 pt-4 border-t border-border">
+                        <button class="btn btn-secondary w-full justify-start gap-3" onclick="showMcpPanel()">
+                            <i class="fas fa-plug text-muted-foreground"></i>
+                            MCP 服务器
+                        </button>
+                    </div>
                 </nav>
                 
                 <!-- Stats Placeholder -->
@@ -906,6 +914,170 @@
             <div class="p-4 border-t border-border bg-muted/30 flex justify-end gap-3">
                 <button type="button" class="btn btn-secondary" onclick="closeConfirmModal(false)">取消</button>
                 <button type="button" class="btn btn-primary bg-destructive hover:bg-destructive/90" id="confirm-btn" onclick="closeConfirmModal(true)">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MCP Modal -->
+    <div id="mcpModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay fixed inset-0 transition-opacity duration-300" onclick="closeMcpModal()"></div>
+        <div class="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 modal-content w-full max-w-3xl rounded-xl overflow-hidden shadow-2xl transition-all duration-300 scale-95 opacity-0" id="mcp-panel">
+            <div class="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <i class="fas fa-plug text-primary"></i>
+                    MCP 服务器管理
+                </h3>
+                <div class="flex items-center gap-2">
+                    <button class="btn btn-secondary h-8 text-xs" onclick="showMcpJsonImportModal()">
+                        <i class="fas fa-file-import mr-1"></i>JSON 导入
+                    </button>
+                    <button class="btn btn-primary h-8 text-xs" onclick="showAddMcpModal()">
+                        <i class="fas fa-plus mr-1"></i>添加服务器
+                    </button>
+                    <button class="text-muted-foreground hover:text-foreground transition-colors" onclick="closeMcpModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <div id="mcp-server-list" class="space-y-3">
+                    <!-- MCP servers will be rendered here -->
+                </div>
+                <div id="mcp-empty-state" class="hidden flex flex-col items-center justify-center h-48 text-muted-foreground">
+                    <div class="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                        <i class="fas fa-plug text-2xl opacity-50"></i>
+                    </div>
+                    <p class="font-medium">暂无 MCP 服务器</p>
+                    <p class="text-sm opacity-70 mt-1">点击 "添加服务器" 开始配置</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MCP Edit Modal -->
+    <div id="mcpEditModal" class="fixed inset-0 z-[55] hidden">
+        <div class="modal-overlay fixed inset-0 transition-opacity duration-300" onclick="closeMcpEditModal()"></div>
+        <div class="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 modal-content w-full max-w-lg rounded-xl overflow-hidden shadow-2xl transition-all duration-300 scale-95 opacity-0" id="mcp-edit-panel">
+            <div class="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                <h3 class="font-bold text-lg" id="mcp-modal-title">添加 MCP 服务器</h3>
+                <button class="text-muted-foreground hover:text-foreground transition-colors" onclick="closeMcpEditModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <form id="mcpForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1.5">服务器名称 <span class="text-destructive">*</span></label>
+                        <input type="text" class="input" id="mcp-name" placeholder="例如: filesystem" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1.5">类型</label>
+                        <div class="flex gap-2">
+                            <button type="button" class="mcp-type-btn flex-1 py-2 px-4 rounded-lg border border-border text-sm font-medium transition-all bg-primary text-primary-foreground" data-type="stdio" onclick="switchMcpType('stdio')">
+                                <i class="fas fa-terminal mr-1"></i>Stdio
+                            </button>
+                            <button type="button" class="mcp-type-btn flex-1 py-2 px-4 rounded-lg border border-border text-sm font-medium transition-all text-muted-foreground hover:bg-muted" data-type="http" onclick="switchMcpType('http')">
+                                <i class="fas fa-globe mr-1"></i>HTTP
+                            </button>
+                        </div>
+                        <input type="hidden" id="mcp-type" value="stdio">
+                    </div>
+
+                    <!-- Stdio Fields -->
+                    <div id="mcp-fields-stdio" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase">Command <span class="text-destructive">*</span></label>
+                            <input type="text" class="input font-mono text-xs" id="mcp-command" placeholder="npx">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase">Args (每行一个参数)</label>
+                            <textarea class="input h-20 py-2 text-xs font-mono leading-tight resize-none" id="mcp-args" placeholder="-y&#10;@anthropic/mcp-server-filesystem&#10;/path/to/dir"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase">环境变量 (KEY=VALUE 格式，每行一个)</label>
+                            <textarea class="input h-16 py-2 text-xs font-mono leading-tight resize-none" id="mcp-env" placeholder="API_KEY=xxx&#10;DEBUG=true"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- HTTP Fields -->
+                    <div id="mcp-fields-http" class="space-y-4 hidden">
+                        <div>
+                            <label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase">URL <span class="text-destructive">*</span></label>
+                            <input type="text" class="input font-mono text-xs" id="mcp-url" placeholder="http://localhost:8080/mcp">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase">官网链接</label>
+                            <input type="text" class="input font-mono text-xs" id="mcp-website" placeholder="https://...">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase">备注</label>
+                            <input type="text" class="input text-xs" id="mcp-tips" placeholder="可选说明">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2">启用平台</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="mcp-platform-claude" class="w-4 h-4 rounded border-border">
+                                <span class="text-sm">Claude Code</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="mcp-platform-codex" class="w-4 h-4 rounded border-border">
+                                <span class="text-sm">Codex</span>
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="p-4 border-t border-border bg-muted/30 flex justify-end gap-3">
+                <button type="button" class="btn btn-secondary" onclick="closeMcpEditModal()">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveMcpServer()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MCP JSON Import Modal -->
+    <div id="mcpJsonImportModal" class="fixed inset-0 z-[55] hidden">
+        <div class="modal-overlay fixed inset-0 transition-opacity duration-300" onclick="closeMcpJsonImportModal()"></div>
+        <div class="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 modal-content w-full max-w-lg rounded-xl overflow-hidden shadow-2xl transition-all duration-300 scale-95 opacity-0" id="mcp-json-import-panel">
+            <div class="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                <h3 class="font-bold text-lg">JSON 导入 MCP 服务器</h3>
+                <button class="text-muted-foreground hover:text-foreground transition-colors" onclick="closeMcpJsonImportModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-6">
+                <p class="text-sm text-muted-foreground mb-4">
+                    粘贴 Claude 格式的 MCP 配置 JSON，支持以下格式：
+                </p>
+                <div class="text-xs text-muted-foreground mb-4 p-3 bg-muted rounded-lg font-mono">
+                    <div>{"mcpServers": {...}}</div>
+                    <div class="mt-1">或直接粘贴 mcpServers 内容</div>
+                </div>
+                <textarea id="mcp-json-input" class="input h-48 py-3 text-xs font-mono leading-tight resize-none" placeholder='{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-server-filesystem", "/path"]
+    }
+  }
+}'></textarea>
+            </div>
+
+            <div class="p-4 border-t border-border bg-muted/30 flex justify-end gap-3">
+                <button type="button" class="btn btn-secondary" onclick="closeMcpJsonImportModal()">取消</button>
+                <button type="button" class="btn btn-primary" onclick="importMcpFromJson()">
+                    <i class="fas fa-file-import mr-1"></i>导入
+                </button>
             </div>
         </div>
     </div>
@@ -2006,6 +2178,388 @@ GEMINI_MODEL={{GEMINI_MODEL}}`;
         window.onclick = function(event) {
             const modal = document.getElementById('configModal');
             if (event.target === modal.querySelector('.modal-overlay')) closeModal();
+        }
+
+        // =====================
+        // MCP Server Management
+        // =====================
+        let mcpServers = [];
+        let editingMcpIndex = -1;
+
+        async function loadMcpServers() {
+            try {
+                mcpServers = await window.go.main.MCPService.ListServers() || [];
+                renderMcpServerList();
+            } catch (e) {
+                console.error('Failed to load MCP servers:', e);
+                mcpServers = [];
+                renderMcpServerList();
+            }
+        }
+
+        function renderMcpServerList() {
+            const container = document.getElementById('mcp-server-list');
+            const emptyState = document.getElementById('mcp-empty-state');
+
+            if (mcpServers.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            let html = '';
+
+            mcpServers.forEach((server, index) => {
+                const platforms = server.enable_platform || [];
+                const hasClaude = platforms.includes('claude-code');
+                const hasCodex = platforms.includes('codex');
+                const hasPlaceholder = server.missing_placeholders && server.missing_placeholders.length > 0;
+
+                let typeIcon = server.type === 'http' ? 'fa-globe' : 'fa-terminal';
+                let platformBadges = '';
+
+                if (hasClaude) {
+                    platformBadges += '<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-500 border border-green-500/20">Claude</span>';
+                }
+                if (hasCodex) {
+                    platformBadges += '<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20 ml-1">Codex</span>';
+                }
+                if (!hasClaude && !hasCodex) {
+                    platformBadges = '<span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">未启用</span>';
+                }
+
+                let warningHtml = '';
+                if (hasPlaceholder) {
+                    warningHtml = `
+                        <div class="mt-2 p-2 rounded bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-600">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            存在未填写的占位符: ${server.missing_placeholders.join(', ')}
+                        </div>
+                    `;
+                }
+
+                let detailInfo = '';
+                if (server.type === 'http') {
+                    detailInfo = `<div class="text-xs text-muted-foreground font-mono truncate">${server.url || '-'}</div>`;
+                } else {
+                    detailInfo = `<div class="text-xs text-muted-foreground font-mono truncate">${server.command || ''} ${(server.args || []).join(' ')}</div>`;
+                }
+
+                html += `
+                    <div class="p-4 rounded-lg border border-border bg-background hover:border-primary/50 transition-all group">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center gap-3 min-w-0 flex-1">
+                                <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas ${typeIcon} text-primary"></i>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <h4 class="font-semibold text-sm">${server.name}</h4>
+                                        ${platformBadges}
+                                    </div>
+                                    ${detailInfo}
+                                    ${server.tips ? `<div class="text-xs text-muted-foreground mt-1">${escapeHtml(server.tips)}</div>` : ''}
+                                </div>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 flex-shrink-0 ml-2">
+                                <button class="w-7 h-7 rounded hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground mcp-test-btn" onclick="testMcpServer(${index}, this)" title="测试连接">
+                                    <i class="fas fa-bolt text-xs"></i>
+                                </button>
+                                ${server.website ? `<a href="${server.website}" target="_blank" class="w-7 h-7 rounded hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground" title="官网"><i class="fas fa-external-link-alt text-xs"></i></a>` : ''}
+                                <button class="w-7 h-7 rounded hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground" onclick="editMcpServer(${index})" title="编辑">
+                                    <i class="fas fa-pen text-xs"></i>
+                                </button>
+                                <button class="w-7 h-7 rounded hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive" onclick="deleteMcpServer(${index})" title="删除">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        ${warningHtml}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function showMcpPanel() {
+            loadMcpServers();
+            const modal = document.getElementById('mcpModal');
+            const panel = document.getElementById('mcp-panel');
+            modal.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                panel.classList.remove('scale-95', 'opacity-0');
+                panel.classList.add('scale-100', 'opacity-100');
+            });
+        }
+
+        function closeMcpModal() {
+            const modal = document.getElementById('mcpModal');
+            const panel = document.getElementById('mcp-panel');
+            panel.classList.remove('scale-100', 'opacity-100');
+            panel.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function showAddMcpModal() {
+            editingMcpIndex = -1;
+            document.getElementById('mcp-modal-title').textContent = '添加 MCP 服务器';
+            document.getElementById('mcpForm').reset();
+            switchMcpType('stdio');
+            document.getElementById('mcp-platform-claude').checked = true;
+            document.getElementById('mcp-platform-codex').checked = false;
+
+            const modal = document.getElementById('mcpEditModal');
+            const panel = document.getElementById('mcp-edit-panel');
+            modal.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                panel.classList.remove('scale-95', 'opacity-0');
+                panel.classList.add('scale-100', 'opacity-100');
+            });
+        }
+
+        function editMcpServer(index) {
+            editingMcpIndex = index;
+            const server = mcpServers[index];
+
+            document.getElementById('mcp-modal-title').textContent = '编辑 MCP 服务器';
+            document.getElementById('mcp-name').value = server.name || '';
+            switchMcpType(server.type || 'stdio');
+
+            if (server.type === 'http') {
+                document.getElementById('mcp-url').value = server.url || '';
+            } else {
+                document.getElementById('mcp-command').value = server.command || '';
+                document.getElementById('mcp-args').value = (server.args || []).join('\n');
+                const envLines = Object.entries(server.env || {}).map(([k, v]) => `${k}=${v}`).join('\n');
+                document.getElementById('mcp-env').value = envLines;
+            }
+
+            document.getElementById('mcp-website').value = server.website || '';
+            document.getElementById('mcp-tips').value = server.tips || '';
+
+            const platforms = server.enable_platform || [];
+            document.getElementById('mcp-platform-claude').checked = platforms.includes('claude-code');
+            document.getElementById('mcp-platform-codex').checked = platforms.includes('codex');
+
+            const modal = document.getElementById('mcpEditModal');
+            const panel = document.getElementById('mcp-edit-panel');
+            modal.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                panel.classList.remove('scale-95', 'opacity-0');
+                panel.classList.add('scale-100', 'opacity-100');
+            });
+        }
+
+        function closeMcpEditModal() {
+            const modal = document.getElementById('mcpEditModal');
+            const panel = document.getElementById('mcp-edit-panel');
+            panel.classList.remove('scale-100', 'opacity-100');
+            panel.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function switchMcpType(type) {
+            document.getElementById('mcp-type').value = type;
+
+            document.querySelectorAll('.mcp-type-btn').forEach(btn => {
+                if (btn.dataset.type === type) {
+                    btn.classList.remove('text-muted-foreground', 'hover:bg-muted');
+                    btn.classList.add('bg-primary', 'text-primary-foreground');
+                } else {
+                    btn.classList.add('text-muted-foreground', 'hover:bg-muted');
+                    btn.classList.remove('bg-primary', 'text-primary-foreground');
+                }
+            });
+
+            if (type === 'http') {
+                document.getElementById('mcp-fields-stdio').classList.add('hidden');
+                document.getElementById('mcp-fields-http').classList.remove('hidden');
+            } else {
+                document.getElementById('mcp-fields-stdio').classList.remove('hidden');
+                document.getElementById('mcp-fields-http').classList.add('hidden');
+            }
+        }
+
+        async function saveMcpServer() {
+            const name = document.getElementById('mcp-name').value.trim();
+            const type = document.getElementById('mcp-type').value;
+
+            if (!name) {
+                showToast('请输入服务器名称', 'error');
+                return;
+            }
+
+            // Check duplicate name
+            const exists = mcpServers.some((s, i) => s.name === name && i !== editingMcpIndex);
+            if (exists) {
+                showToast('服务器名称已存在', 'error');
+                return;
+            }
+
+            let serverData = {
+                name: name,
+                type: type,
+                website: document.getElementById('mcp-website').value.trim(),
+                tips: document.getElementById('mcp-tips').value.trim(),
+                enable_platform: []
+            };
+
+            if (document.getElementById('mcp-platform-claude').checked) {
+                serverData.enable_platform.push('claude-code');
+            }
+            if (document.getElementById('mcp-platform-codex').checked) {
+                serverData.enable_platform.push('codex');
+            }
+
+            if (type === 'http') {
+                const url = document.getElementById('mcp-url').value.trim();
+                if (!url) {
+                    showToast('请输入 URL', 'error');
+                    return;
+                }
+                serverData.url = url;
+            } else {
+                const command = document.getElementById('mcp-command').value.trim();
+                if (!command) {
+                    showToast('请输入 Command', 'error');
+                    return;
+                }
+                serverData.command = command;
+
+                const argsText = document.getElementById('mcp-args').value.trim();
+                serverData.args = argsText ? argsText.split('\n').map(s => s.trim()).filter(s => s) : [];
+
+                const envText = document.getElementById('mcp-env').value.trim();
+                serverData.env = {};
+                if (envText) {
+                    envText.split('\n').forEach(line => {
+                        const idx = line.indexOf('=');
+                        if (idx > 0) {
+                            const key = line.substring(0, idx).trim();
+                            const value = line.substring(idx + 1).trim();
+                            if (key) serverData.env[key] = value;
+                        }
+                    });
+                }
+            }
+
+            try {
+                // Build the complete list
+                let newList = [...mcpServers];
+                if (editingMcpIndex >= 0) {
+                    newList[editingMcpIndex] = serverData;
+                } else {
+                    newList.push(serverData);
+                }
+
+                await window.go.main.MCPService.SaveServers(newList);
+                closeMcpEditModal();
+                await loadMcpServers();
+                showToast('MCP 服务器已保存', 'success');
+            } catch (e) {
+                console.error('Save MCP server failed:', e);
+                showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteMcpServer(index) {
+            const server = mcpServers[index];
+            const confirmed = await showConfirm('删除 MCP 服务器', `确定要删除 "${server.name}" 吗？`, 'danger');
+            if (!confirmed) return;
+
+            try {
+                const newList = mcpServers.filter((_, i) => i !== index);
+                await window.go.main.MCPService.SaveServers(newList);
+                await loadMcpServers();
+                showToast('MCP 服务器已删除', 'success');
+            } catch (e) {
+                console.error('Delete MCP server failed:', e);
+                showToast('删除失败: ' + e.message, 'error');
+            }
+        }
+
+        // JSON 导入相关函数
+        function showMcpJsonImportModal() {
+            document.getElementById('mcp-json-input').value = '';
+            const modal = document.getElementById('mcpJsonImportModal');
+            const panel = document.getElementById('mcp-json-import-panel');
+            modal.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                panel.classList.remove('scale-95', 'opacity-0');
+                panel.classList.add('scale-100', 'opacity-100');
+            });
+        }
+
+        function closeMcpJsonImportModal() {
+            const modal = document.getElementById('mcpJsonImportModal');
+            const panel = document.getElementById('mcp-json-import-panel');
+            panel.classList.remove('scale-100', 'opacity-100');
+            panel.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        async function importMcpFromJson() {
+            const jsonStr = document.getElementById('mcp-json-input').value.trim();
+            if (!jsonStr) {
+                showToast('请输入 JSON 内容', 'error');
+                return;
+            }
+
+            try {
+                // 解析 JSON
+                const servers = await window.go.main.MCPService.ImportFromJSON(jsonStr);
+                if (!servers || servers.length === 0) {
+                    showToast('没有找到有效的服务器配置', 'error');
+                    return;
+                }
+
+                // 添加到服务器列表
+                await window.go.main.MCPService.AddServers(servers);
+
+                closeMcpJsonImportModal();
+                await loadMcpServers();
+                showToast(`成功导入 ${servers.length} 个 MCP 服务器`, 'success');
+            } catch (e) {
+                console.error('Import MCP from JSON failed:', e);
+                showToast('导入失败: ' + e.message, 'error');
+            }
+        }
+
+        // 测试 MCP 服务器
+        async function testMcpServer(index, btn) {
+            const server = mcpServers[index];
+            const icon = btn.querySelector('i');
+            const originalClass = icon.className;
+
+            try {
+                icon.className = 'fas fa-circle-notch fa-spin text-xs';
+                btn.disabled = true;
+
+                const result = await window.go.main.MCPService.TestServer(server);
+
+                if (result.success) {
+                    icon.className = 'fas fa-check text-xs text-green-500';
+                    showToast(`${server.name}: ${result.message} (${result.latency}ms)`, 'success');
+                } else {
+                    icon.className = 'fas fa-times text-xs text-red-500';
+                    showToast(`${server.name}: ${result.message}`, 'error');
+                }
+
+                setTimeout(() => {
+                    icon.className = originalClass;
+                    btn.disabled = false;
+                }, 3000);
+            } catch (e) {
+                console.error('Test MCP server failed:', e);
+                icon.className = 'fas fa-times text-xs text-red-500';
+                showToast('测试失败: ' + e.message, 'error');
+                setTimeout(() => {
+                    icon.className = originalClass;
+                    btn.disabled = false;
+                }, 3000);
+            }
         }
     </script>
 </body>

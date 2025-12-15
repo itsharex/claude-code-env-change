@@ -60,6 +60,57 @@ export namespace main {
 		    return a;
 		}
 	}
+	
+	export class MCPServer {
+	    name: string;
+	    type: string;
+	    command?: string;
+	    args?: string[];
+	    env?: Record<string, string>;
+	    url?: string;
+	    website?: string;
+	    tips?: string;
+	    enable_platform: string[];
+	    enabled_in_claude: boolean;
+	    enabled_in_codex: boolean;
+	    missing_placeholders: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServer(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.command = source["command"];
+	        this.args = source["args"];
+	        this.env = source["env"];
+	        this.url = source["url"];
+	        this.website = source["website"];
+	        this.tips = source["tips"];
+	        this.enable_platform = source["enable_platform"];
+	        this.enabled_in_claude = source["enabled_in_claude"];
+	        this.enabled_in_codex = source["enabled_in_codex"];
+	        this.missing_placeholders = source["missing_placeholders"];
+	    }
+	}
+	export class MCPTestResult {
+	    success: boolean;
+	    message: string;
+	    latency: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPTestResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.latency = source["latency"];
+	    }
+	}
 
 }
 

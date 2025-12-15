@@ -4,7 +4,10 @@ go 1.22.0
 
 toolchain go1.23.2
 
-require github.com/wailsapp/wails/v2 v2.10.2
+require (
+	github.com/pelletier/go-toml/v2 v2.2.4
+	github.com/wailsapp/wails/v2 v2.10.2
+)
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect
