@@ -155,7 +155,7 @@ func (ms *MCPService) SaveServers(servers []MCPServer) error {
 		if typ == "stdio" && command == "" {
 			return fmt.Errorf("%s 需要提供 command", name)
 		}
-		if typ == "http" && url == "" {
+		if (typ == "http" || typ == "sse") && url == "" {
 			return fmt.Errorf("%s 需要提供 url", name)
 		}
 
@@ -298,7 +298,7 @@ func (ms *MCPService) importFromClaude(existing map[string]rawMCPServer) (map[st
 		}
 
 		typ := normalizeServerType(typeHint)
-		if typ == "http" && entry.URL == "" {
+		if (typ == "http" || typ == "sse") && entry.URL == "" {
 			continue
 		}
 		if typ == "stdio" && entry.Command == "" {
@@ -423,6 +423,8 @@ func normalizeServerType(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "http":
 		return "http"
+	case "sse":
+		return "sse"
 	default:
 		return "stdio"
 	}
@@ -583,7 +585,7 @@ func platformContains(platforms []string, target string) bool {
 
 func buildClaudeDesktopEntry(server MCPServer) claudeDesktopServer {
 	entry := claudeDesktopServer{Type: server.Type}
-	if server.Type == "http" {
+	if server.Type == "http" || server.Type == "sse" {
 		entry.URL = server.URL
 	} else {
 		entry.Command = server.Command
@@ -600,7 +602,7 @@ func buildClaudeDesktopEntry(server MCPServer) claudeDesktopServer {
 func buildCodexEntry(server MCPServer) map[string]any {
 	entry := make(map[string]any)
 	entry["type"] = server.Type
-	if server.Type == "http" {
+	if server.Type == "http" || server.Type == "sse" {
 		entry["url"] = server.URL
 	} else {
 		entry["command"] = server.Command
@@ -675,7 +677,7 @@ type MCPTestResult struct {
 func (ms *MCPService) TestServer(server MCPServer) MCPTestResult {
 	start := time.Now()
 
-	if server.Type == "http" {
+	if server.Type == "http" || server.Type == "sse" {
 		return ms.testHTTPServer(server.URL, start)
 	}
 	return ms.testStdioServer(server.Command, server.Args, server.Env, start)
@@ -835,7 +837,7 @@ func (ms *MCPService) parseClaudeFormat(servers map[string]claudeDesktopServer) 
 		}
 
 		// 验证
-		if serverType == "http" && server.URL == "" {
+		if (serverType == "http" || serverType == "sse") && server.URL == "" {
 			continue
 		}
 		if serverType == "stdio" && server.Command == "" {
@@ -897,18 +899,51 @@ func (ms *MCPService) AddServers(newServers []MCPServer) error {
 		}
 	}
 
-	// 保存并同步
+	// 保存配置
 	if err := ms.saveConfig(config); err != nil {
 		return err
 	}
 
-	// 重新加载并同步
-	servers, err := ms.ListServers()
-	if err != nil {
-		return err
-	}
+	// 从 config 构建 servers 列表用于同步（不调用 ListServers 避免死锁）
+	servers := ms.buildServersFromConfig(config)
 	if err := ms.syncClaudeServers(servers); err != nil {
 		return err
 	}
 	return ms.syncCodexServers(servers)
+}
+
+// buildServersFromConfig 从配置构建服务器列表（内部使用，不加锁）
+func (ms *MCPService) buildServersFromConfig(config map[string]rawMCPServer) []MCPServer {
+	claudeEnabled := loadClaudeEnabledServers()
+	codexEnabled := loadCodexEnabledServers()
+
+	names := make([]string, 0, len(config))
+	for name := range config {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	servers := make([]MCPServer, 0, len(names))
+	for _, name := range names {
+		entry := config[name]
+		typ := normalizeServerType(entry.Type)
+		platforms := normalizePlatforms(entry.EnablePlatform)
+		server := MCPServer{
+			Name:            name,
+			Type:            typ,
+			Command:         strings.TrimSpace(entry.Command),
+			Args:            cloneArgs(entry.Args),
+			Env:             cloneEnv(entry.Env),
+			URL:             strings.TrimSpace(entry.URL),
+			Website:         strings.TrimSpace(entry.Website),
+			Tips:            strings.TrimSpace(entry.Tips),
+			EnablePlatform:  platforms,
+			EnabledInClaude: containsNormalized(claudeEnabled, name),
+			EnabledInCodex:  containsNormalized(codexEnabled, name),
+		}
+		server.MissingPlaceholders = detectPlaceholders(server.URL, server.Args)
+		servers = append(servers, server)
+	}
+
+	return servers
 }

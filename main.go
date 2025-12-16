@@ -16,6 +16,7 @@ func main() {
 	// Create an instance of the app structure
 	app := NewApp()
 	mcpService := NewMCPService()
+	logService := NewLogService()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -42,6 +43,7 @@ func main() {
 		Bind: []interface{}{
 			app,
 			mcpService,
+			logService,
 		},
 	})
 

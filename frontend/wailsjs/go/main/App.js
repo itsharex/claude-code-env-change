@@ -30,6 +30,10 @@ export function DeleteEnv(arg1) {
   return window['go']['main']['App']['DeleteEnv'](arg1);
 }
 
+export function DeletePromptFile(arg1) {
+  return window['go']['main']['App']['DeletePromptFile'](arg1);
+}
+
 export function ExportConfig(arg1) {
   return window['go']['main']['App']['ExportConfig'](arg1);
 }
@@ -54,8 +58,16 @@ export function GetGeminiSettings() {
   return window['go']['main']['App']['GetGeminiSettings']();
 }
 
-export function ImportConfig(arg1) {
-  return window['go']['main']['App']['ImportConfig'](arg1);
+export function GetPromptFile(arg1) {
+  return window['go']['main']['App']['GetPromptFile'](arg1);
+}
+
+export function GetPromptFiles() {
+  return window['go']['main']['App']['GetPromptFiles']();
+}
+
+export function ImportConfig() {
+  return window['go']['main']['App']['ImportConfig']();
 }
 
 export function RefreshConfig() {
@@ -64,6 +76,10 @@ export function RefreshConfig() {
 
 export function ReorderEnvs(arg1) {
   return window['go']['main']['App']['ReorderEnvs'](arg1);
+}
+
+export function SavePromptFile(arg1, arg2) {
+  return window['go']['main']['App']['SavePromptFile'](arg1, arg2);
 }
 
 export function SetEnvVar(arg1, arg2) {

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // EnvConfig 环境配置
@@ -638,32 +640,61 @@ func (a *App) RefreshConfig() error {
 	return a.loadConfig()
 }
 
-// ExportConfig 导出配置到指定路径
-func (a *App) ExportConfig(filePath string) error {
+// ExportConfig 导出配置到指定路径（带文件选择对话框）
+func (a *App) ExportConfig(defaultName string) (string, error) {
+	// 打开保存文件对话框
+	filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "导出配置",
+		DefaultFilename: defaultName,
+		Filters: []runtime.FileFilter{
+			{DisplayName: "JSON 文件", Pattern: "*.json"},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("打开对话框失败: %v", err)
+	}
+	if filePath == "" {
+		return "", nil // 用户取消
+	}
+
 	data, err := json.MarshalIndent(a.config, "", "  ")
 	if err != nil {
-		return fmt.Errorf("序列化配置失败: %v", err)
+		return "", fmt.Errorf("序列化配置失败: %v", err)
 	}
 
 	err = os.WriteFile(filePath, data, 0644)
 	if err != nil {
-		return fmt.Errorf("导出配置文件失败: %v", err)
+		return "", fmt.Errorf("导出配置文件失败: %v", err)
 	}
 
-	return nil
+	return filePath, nil
 }
 
-// ImportConfig 从指定路径导入配置
-func (a *App) ImportConfig(filePath string) error {
+// ImportConfig 从指定路径导入配置（带文件选择对话框）
+func (a *App) ImportConfig() (int, error) {
+	// 打开文件选择对话框
+	filePath, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "导入配置",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "JSON 文件", Pattern: "*.json"},
+		},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("打开对话框失败: %v", err)
+	}
+	if filePath == "" {
+		return 0, nil // 用户取消
+	}
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("读取配置文件失败: %v", err)
+		return 0, fmt.Errorf("读取配置文件失败: %v", err)
 	}
 
 	var importedConfig Config
 	err = json.Unmarshal(data, &importedConfig)
 	if err != nil {
-		return fmt.Errorf("解析配置文件失败: %v", err)
+		return 0, fmt.Errorf("解析配置文件失败: %v", err)
 	}
 
 	// 合并配置：检查是否有重名的环境配置
@@ -696,10 +727,10 @@ func (a *App) ImportConfig(filePath string) error {
 	// 保存合并后的配置
 	err = a.saveConfig()
 	if err != nil {
-		return fmt.Errorf("保存配置失败: %v", err)
+		return 0, fmt.Errorf("保存配置失败: %v", err)
 	}
 
-	return nil
+	return importCount, nil
 }
 
 func (a *App) loadConfig() error {
@@ -755,6 +786,131 @@ func (a *App) saveConfig() error {
 	err = os.WriteFile(a.configPath, data, 0644)
 	if err != nil {
 		return fmt.Errorf("保存配置文件失败: %v", err)
+	}
+
+	return nil
+}
+
+// PromptFile 提示词文件信息
+type PromptFile struct {
+	Provider string `json:"provider"` // claude, codex, gemini
+	Path     string `json:"path"`     // 文件路径
+	Content  string `json:"content"`  // 文件内容
+	Exists   bool   `json:"exists"`   // 文件是否存在
+}
+
+// GetPromptFiles 获取所有提示词文件
+func (a *App) GetPromptFiles() ([]PromptFile, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("获取用户目录失败: %v", err)
+	}
+
+	files := []PromptFile{
+		{Provider: "claude", Path: filepath.Join(homeDir, ".claude", "CLAUDE.md")},
+		{Provider: "codex", Path: filepath.Join(homeDir, ".codex", "AGENTS.md")},
+		{Provider: "gemini", Path: filepath.Join(homeDir, ".gemini", "GEMINI.md")},
+	}
+
+	for i := range files {
+		if data, err := os.ReadFile(files[i].Path); err == nil {
+			files[i].Content = string(data)
+			files[i].Exists = true
+		} else {
+			files[i].Content = ""
+			files[i].Exists = false
+		}
+	}
+
+	return files, nil
+}
+
+// GetPromptFile 获取单个提示词文件
+func (a *App) GetPromptFile(provider string) (PromptFile, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return PromptFile{}, fmt.Errorf("获取用户目录失败: %v", err)
+	}
+
+	var filePath string
+	switch provider {
+	case "claude":
+		filePath = filepath.Join(homeDir, ".claude", "CLAUDE.md")
+	case "codex":
+		filePath = filepath.Join(homeDir, ".codex", "AGENTS.md")
+	case "gemini":
+		filePath = filepath.Join(homeDir, ".gemini", "GEMINI.md")
+	default:
+		return PromptFile{}, fmt.Errorf("未知的 Provider: %s", provider)
+	}
+
+	file := PromptFile{Provider: provider, Path: filePath}
+	if data, err := os.ReadFile(filePath); err == nil {
+		file.Content = string(data)
+		file.Exists = true
+	}
+
+	return file, nil
+}
+
+// SavePromptFile 保存提示词文件
+func (a *App) SavePromptFile(provider, content string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("获取用户目录失败: %v", err)
+	}
+
+	var filePath string
+	var dirPath string
+	switch provider {
+	case "claude":
+		dirPath = filepath.Join(homeDir, ".claude")
+		filePath = filepath.Join(dirPath, "CLAUDE.md")
+	case "codex":
+		dirPath = filepath.Join(homeDir, ".codex")
+		filePath = filepath.Join(dirPath, "AGENTS.md")
+	case "gemini":
+		dirPath = filepath.Join(homeDir, ".gemini")
+		filePath = filepath.Join(dirPath, "GEMINI.md")
+	default:
+		return fmt.Errorf("未知的 Provider: %s", provider)
+	}
+
+	// 确保目录存在
+	if err := os.MkdirAll(dirPath, 0755); err != nil {
+		return fmt.Errorf("创建目录失败: %v", err)
+	}
+
+	// 写入文件
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("写入文件失败: %v", err)
+	}
+
+	return nil
+}
+
+// DeletePromptFile 删除提示词文件
+func (a *App) DeletePromptFile(provider string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("获取用户目录失败: %v", err)
+	}
+
+	var filePath string
+	switch provider {
+	case "claude":
+		filePath = filepath.Join(homeDir, ".claude", "CLAUDE.md")
+	case "codex":
+		filePath = filepath.Join(homeDir, ".codex", "AGENTS.md")
+	case "gemini":
+		filePath = filepath.Join(homeDir, ".gemini", "GEMINI.md")
+	default:
+		return fmt.Errorf("未知的 Provider: %s", provider)
+	}
+
+	// 删除文件（如果不存在则忽略）
+	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("删除文件失败: %v", err)
 	}
 
 	return nil

@@ -1,9 +1,30 @@
 {
-  "current_env": "323",
-  "current_env_claude": "",
+  "current_env": "修改1",
+  "current_env_claude": "修改1",
   "current_env_codex": "123",
   "current_env_gemini": "323",
   "environments": [
+    {
+      "name": "123",
+      "description": "",
+      "variables": {
+        "base_url": "4234",
+        "model": "423"
+      },
+      "provider": "codex"
+    },
+    {
+      "name": "修改1",
+      "description": "",
+      "variables": {
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_AUTH_TOKEN": "54354354",
+        "ANTHROPIC_BASE_URL": "54343",
+        "ANTHROPIC_MODEL": ""
+      },
+      "provider": "claude",
+      "icon": "😄"
+    },
     {
       "name": "4324",
       "description": "345",
@@ -15,27 +36,6 @@
       },
       "provider": "claude",
       "icon": "😄"
-    },
-    {
-      "name": "修改1",
-      "description": "",
-      "variables": {
-        "ANTHROPIC_API_KEY": "",
-        "ANTHROPIC_AUTH_TOKEN": "643643634",
-        "ANTHROPIC_BASE_URL": "643643643634",
-        "ANTHROPIC_MODEL": ""
-      },
-      "provider": "claude",
-      "icon": "😄"
-    },
-    {
-      "name": "123",
-      "description": "",
-      "variables": {
-        "base_url": "4234",
-        "model": "423"
-      },
-      "provider": "codex"
     },
     {
       "name": "543543",

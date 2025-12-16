@@ -2,14 +2,11 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "claude-model-switcher",
   "outputfilename": "claude-env-switcher",
-  "frontend": {
-    "dir": "./frontend",
-    "install": "",
-    "build": "",
-    "dev": "",
-    "package": "",
-    "watcher": null
-  },
+  "frontend:dir": "./frontend",
+  "frontend:install": "pnpm install",
+  "frontend:build": "pnpm run build",
+  "frontend:dev:watcher": "pnpm run dev",
+  "frontend:dev:serverUrl": "http://localhost:5173",
   "author": {
     "name": "",
     "email": ""
@@ -17,9 +14,9 @@
   "info": {
     "companyName": "",
     "productName": "Claude Code 环境管理器",
-    "productVersion": "1.0.0",
+    "productVersion": "2.0.0",
     "copyright": "",
-    "comments": "Claude Code环境变量管理工具 - 现代化UI版本"
+    "comments": "Claude Code环境变量管理工具 - Vue 3 重构版本"
   },
   "nsisType": "multiple",
   "obfuscated": false,

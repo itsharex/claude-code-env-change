@@ -16,7 +16,9 @@ export function ClearGeminiSettings():Promise<void>;
 
 export function DeleteEnv(arg1:string):Promise<void>;
 
-export function ExportConfig(arg1:string):Promise<void>;
+export function DeletePromptFile(arg1:string):Promise<void>;
+
+export function ExportConfig(arg1:string):Promise<string>;
 
 export function GetClaudeSettings():Promise<Record<string, string>>;
 
@@ -28,11 +30,17 @@ export function GetEnvVar(arg1:string):Promise<string>;
 
 export function GetGeminiSettings():Promise<Record<string, string>>;
 
-export function ImportConfig(arg1:string):Promise<void>;
+export function GetPromptFile(arg1:string):Promise<main.PromptFile>;
+
+export function GetPromptFiles():Promise<Array<main.PromptFile>>;
+
+export function ImportConfig():Promise<number>;
 
 export function RefreshConfig():Promise<void>;
 
 export function ReorderEnvs(arg1:Array<string>):Promise<void>;
+
+export function SavePromptFile(arg1:string,arg2:string):Promise<void>;
 
 export function SetEnvVar(arg1:string,arg2:string):Promise<void>;
 
