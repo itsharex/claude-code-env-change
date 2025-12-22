@@ -241,7 +241,8 @@ const heatmapWeeks = 26 // ~6 months
 const platforms = [
   { value: 'all' as StatsPlatform, label: '全部', icon: 'fas fa-layer-group' },
   { value: 'claude' as StatsPlatform, label: 'Claude', icon: 'fas fa-robot' },
-  { value: 'gemini' as StatsPlatform, label: 'Gemini', icon: 'fas fa-gem' }
+  { value: 'gemini' as StatsPlatform, label: 'Gemini', icon: 'fas fa-gem' },
+  { value: 'codex' as StatsPlatform, label: 'Codex', icon: 'fas fa-code' }
 ]
 
 // Glider for tabs
@@ -450,6 +451,7 @@ function formatCost(cost: number): string {
 
 function formatModelName(model: string): string {
   // Extract friendly name from model ID
+  // Claude models
   if (model.includes('opus-4-5')) return 'Opus 4.5'
   if (model.includes('opus-4-1')) return 'Opus 4.1'
   if (model.includes('opus-4')) return 'Opus 4'
@@ -460,10 +462,22 @@ function formatModelName(model: string): string {
   if (model.includes('3-5-sonnet')) return 'Sonnet 3.5'
   if (model.includes('3-5-haiku')) return 'Haiku 3.5'
   if (model.includes('haiku')) return 'Haiku'
+  // GPT models
   if (model.includes('gpt-4o-mini')) return 'GPT-4o Mini'
   if (model.includes('gpt-4o')) return 'GPT-4o'
   if (model.includes('gpt-4-turbo')) return 'GPT-4 Turbo'
   if (model.includes('gpt-4')) return 'GPT-4'
+  // Codex models
+  if (model.includes('gpt-5.2-codex')) return 'GPT-5.2 Codex'
+  if (model.includes('gpt-5.2')) return 'GPT-5.2'
+  if (model.includes('gpt-5.1-codex-mini')) return 'GPT-5.1 Codex Mini'
+  if (model.includes('gpt-5.1-codex-max')) return 'GPT-5.1 Codex Max'
+  if (model.includes('gpt-5.1-codex')) return 'GPT-5.1 Codex'
+  if (model.includes('gpt-5.1')) return 'GPT-5.1'
+  if (model.includes('gpt-5-codex')) return 'GPT-5 Codex'
+  if (model.includes('gpt-5')) return 'GPT-5'
+  if (model.includes('codex-1')) return 'Codex-1'
+  // Gemini models
   if (model.includes('gemini-2.0')) return 'Gemini 2.0'
   if (model.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro'
   if (model.includes('gemini-1.5-flash')) return 'Gemini 1.5 Flash'

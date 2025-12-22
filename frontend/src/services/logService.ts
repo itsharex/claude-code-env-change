@@ -1,6 +1,6 @@
 import { GetUsageStats, GetHeatmapData, GetRecentLogs, GetLogDirectory } from '../../wailsjs/go/main/LogService'
 
-export type StatsPlatform = 'all' | 'claude' | 'gemini'
+export type StatsPlatform = 'all' | 'claude' | 'gemini' | 'codex'
 
 export interface UsageRecord {
   timestamp: string

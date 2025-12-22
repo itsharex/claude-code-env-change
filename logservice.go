@@ -130,6 +130,16 @@ var modelPricing = map[string]struct {
 	"gemini-1.5-pro":               {Input: 1.25, Output: 5.0, CacheCreate: 0.3125, CacheRead: 0},
 	"gemini-1.5-flash":             {Input: 0.075, Output: 0.3, CacheCreate: 0.01875, CacheRead: 0},
 	"gemini-3-pro":                 {Input: 2.5, Output: 15.0, CacheCreate: 0.625, CacheRead: 0},
+	// OpenAI Codex series (https://developers.openai.com/codex/pricing/)
+	"gpt-5.2-codex":                {Input: 1.75, Output: 14.0, CacheCreate: 0, CacheRead: 0.175},
+	"gpt-5.2":                      {Input: 1.75, Output: 14.0, CacheCreate: 0, CacheRead: 0.175},
+	"gpt-5.1-codex-mini":           {Input: 0.30, Output: 1.20, CacheCreate: 0, CacheRead: 0.03},
+	"gpt-5.1-codex-max":            {Input: 1.50, Output: 12.0, CacheCreate: 0, CacheRead: 0.15},
+	"gpt-5.1-codex":                {Input: 1.50, Output: 12.0, CacheCreate: 0, CacheRead: 0.15},
+	"gpt-5.1":                      {Input: 1.50, Output: 12.0, CacheCreate: 0, CacheRead: 0.15},
+	"gpt-5-codex":                  {Input: 1.25, Output: 10.0, CacheCreate: 0, CacheRead: 0.125},
+	"gpt-5":                        {Input: 1.25, Output: 10.0, CacheCreate: 0, CacheRead: 0.125},
+	"codex-1":                      {Input: 1.25, Output: 10.0, CacheCreate: 0, CacheRead: 0.125},
 }
 
 // GetUsageStats 获取使用统计 (最近N天, 按平台筛选)
@@ -159,6 +169,12 @@ func (ls *LogService) GetUsageStats(days int, platform string) (UsageStats, erro
 			geminiRecords = []UsageRecord{}
 		}
 		records = geminiRecords
+	case "codex":
+		codexRecords, err := ls.readCodexLogs(days)
+		if err != nil {
+			codexRecords = []UsageRecord{}
+		}
+		records = codexRecords
 	default: // "all" 或其他
 		claudeRecords, err := ls.readClaudeLogs(days)
 		if err != nil {
@@ -168,7 +184,12 @@ func (ls *LogService) GetUsageStats(days int, platform string) (UsageStats, erro
 		if err != nil {
 			geminiRecords = []UsageRecord{}
 		}
+		codexRecords, err := ls.readCodexLogs(days)
+		if err != nil {
+			codexRecords = []UsageRecord{}
+		}
 		records = append(claudeRecords, geminiRecords...)
+		records = append(records, codexRecords...)
 	}
 
 	if len(records) == 0 {
@@ -242,6 +263,12 @@ func (ls *LogService) GetHeatmapData(days int, platform string) ([]HeatmapData, 
 			geminiRecords = []UsageRecord{}
 		}
 		records = geminiRecords
+	case "codex":
+		codexRecords, err := ls.readCodexLogs(days)
+		if err != nil {
+			codexRecords = []UsageRecord{}
+		}
+		records = codexRecords
 	default: // "all" 或其他
 		claudeRecords, err := ls.readClaudeLogs(days)
 		if err != nil {
@@ -251,7 +278,12 @@ func (ls *LogService) GetHeatmapData(days int, platform string) ([]HeatmapData, 
 		if err != nil {
 			geminiRecords = []UsageRecord{}
 		}
+		codexRecords, err := ls.readCodexLogs(days)
+		if err != nil {
+			codexRecords = []UsageRecord{}
+		}
 		records = append(claudeRecords, geminiRecords...)
+		records = append(records, codexRecords...)
 	}
 
 	if len(records) == 0 {
@@ -310,6 +342,12 @@ func (ls *LogService) GetRecentLogs(limit int, platform string) ([]UsageRecord, 
 			geminiRecords = []UsageRecord{}
 		}
 		records = geminiRecords
+	case "codex":
+		codexRecords, err := ls.readCodexLogs(7)
+		if err != nil {
+			codexRecords = []UsageRecord{}
+		}
+		records = codexRecords
 	default: // "all" 或其他
 		claudeRecords, err := ls.readClaudeLogs(7)
 		if err != nil {
@@ -319,7 +357,12 @@ func (ls *LogService) GetRecentLogs(limit int, platform string) ([]UsageRecord, 
 		if err != nil {
 			geminiRecords = []UsageRecord{}
 		}
+		codexRecords, err := ls.readCodexLogs(7)
+		if err != nil {
+			codexRecords = []UsageRecord{}
+		}
 		records = append(claudeRecords, geminiRecords...)
+		records = append(records, codexRecords...)
 	}
 
 	if len(records) == 0 {
@@ -739,4 +782,201 @@ func parseTimestamp(ts string) (time.Time, error) {
 	}
 
 	return time.Time{}, nil
+}
+
+// Codex CLI 日志条目结构
+type codexLogEntry struct {
+	Type      string        `json:"type"`
+	Timestamp string        `json:"timestamp"`
+	Payload   *codexPayload `json:"payload"`
+}
+
+type codexPayload struct {
+	Type  string          `json:"type"`
+	Info  *codexTokenInfo `json:"info"`
+	Model string          `json:"model"` // for turn_context entries
+}
+
+type codexTokenInfo struct {
+	TotalTokenUsage *codexTokenUsage `json:"total_token_usage"`
+	LastTokenUsage  *codexTokenUsage `json:"last_token_usage"`
+}
+
+type codexTokenUsage struct {
+	InputTokens           int `json:"input_tokens"`
+	CachedInputTokens     int `json:"cached_input_tokens"`
+	OutputTokens          int `json:"output_tokens"`
+	ReasoningOutputTokens int `json:"reasoning_output_tokens"`
+	TotalTokens           int `json:"total_tokens"`
+}
+
+// readCodexLogs 读取 Codex CLI 日志文件
+func (ls *LogService) readCodexLogs(days int) ([]UsageRecord, error) {
+	codexDir := ls.getCodexDir()
+	if codexDir == "" {
+		return []UsageRecord{}, nil
+	}
+
+	// Codex 日志路径: ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+	sessionsDir := filepath.Join(codexDir, "sessions")
+	if _, err := os.Stat(sessionsDir); os.IsNotExist(err) {
+		return []UsageRecord{}, nil
+	}
+
+	// 计算时间范围
+	cutoff := time.Now().AddDate(0, 0, -days)
+
+	var records []UsageRecord
+
+	// 遍历 sessions 目录下的日期文件夹
+	err := filepath.Walk(sessionsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // 忽略错误，继续遍历
+		}
+
+		// 只处理 .jsonl 文件
+		if info.IsDir() || !strings.HasSuffix(info.Name(), ".jsonl") {
+			return nil
+		}
+
+		// 检查文件修改时间
+		if info.ModTime().Before(cutoff) {
+			return nil
+		}
+
+		// 解析会话文件
+		sessionRecords, err := ls.parseCodexSession(path, info.Name(), cutoff)
+		if err != nil {
+			return nil // 忽略解析错误
+		}
+
+		records = append(records, sessionRecords...)
+		return nil
+	})
+
+	if err != nil {
+		return []UsageRecord{}, nil
+	}
+
+	if records == nil {
+		records = []UsageRecord{}
+	}
+
+	return records, nil
+}
+
+// parseCodexSession 解析 Codex 会话 JSONL 文件
+func (ls *LogService) parseCodexSession(path string, sessionID string, cutoff time.Time) ([]UsageRecord, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var records []UsageRecord
+	scanner := bufio.NewScanner(file)
+	buf := make([]byte, 0, 1024*1024)
+	scanner.Buffer(buf, 10*1024*1024)
+
+	var lastTotalTokens *codexTokenUsage
+	var currentModel string = "gpt-5-codex" // 默认模型
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		// 先尝试解析为 event_msg 格式
+		var eventEntry struct {
+			Type      string `json:"type"`
+			Timestamp string `json:"timestamp"`
+			Payload   *struct {
+				Type  string          `json:"type"`
+				Info  *codexTokenInfo `json:"info"`
+				Model string          `json:"model"`
+			} `json:"payload"`
+		}
+
+		if err := json.Unmarshal([]byte(line), &eventEntry); err != nil {
+			continue
+		}
+
+		// 解析时间戳
+		ts, err := parseTimestamp(eventEntry.Timestamp)
+		if err != nil || ts.Before(cutoff) {
+			continue
+		}
+
+		// 处理 turn_context 类型 - 获取模型信息
+		if eventEntry.Type == "turn_context" && eventEntry.Payload != nil && eventEntry.Payload.Model != "" {
+			currentModel = eventEntry.Payload.Model
+			continue
+		}
+
+		// 处理 event_msg 类型的 token_count
+		if eventEntry.Type == "event_msg" && eventEntry.Payload != nil && eventEntry.Payload.Type == "token_count" {
+			if eventEntry.Payload.Info == nil || eventEntry.Payload.Info.TotalTokenUsage == nil {
+				continue
+			}
+
+			tc := eventEntry.Payload.Info.TotalTokenUsage
+
+			// 计算增量 (Codex 日志是累计值)
+			var inputDelta, cachedDelta, outputDelta int
+			if lastTotalTokens != nil {
+				inputDelta = tc.InputTokens - lastTotalTokens.InputTokens
+				cachedDelta = tc.CachedInputTokens - lastTotalTokens.CachedInputTokens
+				outputDelta = tc.OutputTokens - lastTotalTokens.OutputTokens
+			} else {
+				inputDelta = tc.InputTokens
+				cachedDelta = tc.CachedInputTokens
+				outputDelta = tc.OutputTokens
+			}
+
+			// 只记录有增量的条目
+			if inputDelta > 0 || outputDelta > 0 {
+				cost := ls.calculateCost(
+					currentModel,
+					inputDelta,
+					outputDelta,
+					0,
+					cachedDelta,
+				)
+
+				record := UsageRecord{
+					Timestamp:        ts.Format("2006-01-02 15:04:05"),
+					Model:            currentModel,
+					InputTokens:      inputDelta,
+					OutputTokens:     outputDelta,
+					CacheReadTokens:  cachedDelta,
+					CacheWriteTokens: 0,
+					TotalCost:        cost,
+					SessionID:        sessionID,
+					ProjectPath:      filepath.Base(path),
+				}
+
+				records = append(records, record)
+			}
+
+			lastTotalTokens = tc
+		}
+	}
+
+	return records, nil
+}
+
+// getCodexDir 获取 Codex CLI 目录路径
+func (ls *LogService) getCodexDir() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	// 检查 CODEX_HOME 环境变量
+	if codexHome := os.Getenv("CODEX_HOME"); codexHome != "" {
+		return codexHome
+	}
+
+	return filepath.Join(homeDir, ".codex")
 }
