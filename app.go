@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -467,7 +468,11 @@ requires_openai_auth = true
 	}
 
 	configFile := filepath.Join(codexDir, "config.toml")
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+	configData, err := buildCodexConfigData(configContent, configFile)
+	if err != nil {
+		return "", fmt.Errorf("序列化 config.toml 失败: %v", err)
+	}
+	if err := os.WriteFile(configFile, configData, 0644); err != nil {
 		return "", fmt.Errorf("写入 config.toml 失败: %v", err)
 	}
 
@@ -488,6 +493,42 @@ requires_openai_auth = true
 	}
 
 	return "Codex 配置已应用", nil
+}
+
+func buildCodexConfigData(configContent, configFile string) ([]byte, error) {
+	existingMcpServers := readCodexMcpServers(configFile)
+	var payload map[string]any
+	if err := toml.Unmarshal([]byte(configContent), &payload); err == nil && payload != nil {
+		if len(existingMcpServers) > 0 {
+			if _, ok := payload["mcp_servers"]; !ok {
+				payload["mcp_servers"] = existingMcpServers
+			}
+		}
+		return toml.Marshal(payload)
+	}
+
+	data := []byte(configContent)
+	if len(existingMcpServers) > 0 && !strings.Contains(configContent, "mcp_servers") {
+		if mcpData, err := toml.Marshal(map[string]any{"mcp_servers": existingMcpServers}); err == nil {
+			data = []byte(strings.TrimRight(configContent, "\r\n\t ") + "\n\n" + string(mcpData))
+		}
+	}
+	return data, nil
+}
+
+func readCodexMcpServers(configFile string) map[string]map[string]any {
+	data, err := os.ReadFile(configFile)
+	if err != nil || len(data) == 0 {
+		return nil
+	}
+	var payload codexMcpFilePayload
+	if err := toml.Unmarshal(data, &payload); err != nil {
+		return nil
+	}
+	if len(payload.Servers) == 0 {
+		return nil
+	}
+	return payload.Servers
 }
 
 // applyGeminiEnv 应用 Gemini CLI 配置

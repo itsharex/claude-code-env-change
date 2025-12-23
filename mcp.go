@@ -412,15 +412,48 @@ func (ms *MCPService) syncCodexServers(servers []MCPServer) error {
 	}
 
 	payload := make(map[string]any)
+	existingServers := map[string]map[string]any{}
 	if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
 		if err := toml.Unmarshal(data, &payload); err != nil {
 			payload = make(map[string]any)
+		}
+		var mcpPayload codexMcpFilePayload
+		if err := toml.Unmarshal(data, &mcpPayload); err == nil && len(mcpPayload.Servers) > 0 {
+			existingServers = mcpPayload.Servers
 		}
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
-	payload["mcp_servers"] = desired
+	managed := map[string]struct{}{}
+	for _, server := range servers {
+		name := strings.TrimSpace(server.Name)
+		if name == "" {
+			continue
+		}
+		managed[strings.ToLower(name)] = struct{}{}
+	}
+
+	merged := make(map[string]map[string]any)
+	for name, entry := range existingServers {
+		trimmed := strings.TrimSpace(name)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := managed[strings.ToLower(trimmed)]; ok {
+			continue
+		}
+		merged[name] = entry
+	}
+	for name, entry := range desired {
+		trimmed := strings.TrimSpace(name)
+		if trimmed == "" {
+			continue
+		}
+		merged[trimmed] = entry
+	}
+
+	payload["mcp_servers"] = merged
 	data, err := toml.Marshal(payload)
 	if err != nil {
 		return err
